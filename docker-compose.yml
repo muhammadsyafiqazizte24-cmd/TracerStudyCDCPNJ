@@ -1,0 +1,27 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379
+      WA_AUTH_DIR: /app/auth_info_baileys
+      GOOGLE_APPLICATION_CREDENTIALS: /app/credentials/service-account.json
+    volumes:
+      - ./auth_info_baileys:/app/auth_info_baileys
+      - ./credentials:/app/credentials:ro
+      - ./templates:/app/templates:ro
+    ports:
+      - "127.0.0.1:3000:3000"   # buka ke publik lewat reverse proxy HTTPS
+    depends_on: [redis]
+    restart: unless-stopped
+    # JANGAN di-scale: satu sesi Baileys = satu proses.
+
+volumes:
+  redis-data:

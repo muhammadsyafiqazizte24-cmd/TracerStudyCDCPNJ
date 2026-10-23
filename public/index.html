@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pengiriman Tracer Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #EEF2F0; --panel: #FFFFFF; --ink: #17252E; --muted: #5B6B73; --line: #D5DDDA;
+    --accent: #1C6E8C; --ok: #2F7D4F; --warn: #A86A12; --danger: #B0383A;
+    --ok-soft: #E3F1E8; --warn-soft: #F7EEDC; --danger-soft: #F6E3E3; --accent-soft: #E1EEF3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0F1A1F; --panel: #16242B; --ink: #E3EBEE; --muted: #93A5AD; --line: #2A3B43;
+      --accent: #5BB0CF; --ok: #5FBF85; --warn: #E0A84A; --danger: #E57373;
+      --ok-soft: #173327; --warn-soft: #3A2D14; --danger-soft: #3B1C1E; --accent-soft: #173341;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 15px/1.55 "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 48px; }
+  h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0 0 6px; }
+  h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
+
+  .status {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border-left: 6px solid var(--state, var(--muted)); padding: 6px 0 6px 16px; margin-bottom: 24px;
+  }
+  .status strong { font-size: clamp(24px, 4vw, 34px); font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
+  .status span { color: var(--muted); }
+  .alert {
+    background: var(--danger-soft); color: var(--danger); border-radius: 6px;
+    padding: 12px 14px; margin: -8px 0 22px; font-weight: 500; display: none;
+  }
+  .alert.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .grid { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+  .stack > * + * { margin-top: 20px; }
+
+  .qr { display: grid; place-items: center; background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+  .qr img { width: 100%; max-width: 280px; image-rendering: pixelated; }
+  .hint { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+  .hint ol { padding-left: 18px; margin: 6px 0 0; }
+
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    border-radius: 6px; padding: 8px 14px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink);
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: .5; cursor: progress; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-bottom: 18px; }
+  .counts div { padding: 4px 12px; border-left: 1px solid var(--line); }
+  .counts div:first-child { border-left: 0; padding-left: 0; }
+  .counts b { display: block; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .counts small { color: var(--muted); font-size: 13px; }
+  @media (max-width: 520px) { .counts { grid-template-columns: repeat(3, 1fr); row-gap: 12px; } .counts div:nth-child(4) { border-left: 0; padding-left: 0; } }
+
+  .meter { margin: 4px 0 6px; height: 8px; background: var(--accent-soft); border-radius: 4px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  ul.log { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+  ul.log li { display: grid; grid-template-columns: 64px 1fr; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  ul.log li:first-child { border-top: 0; }
+  ul.log time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  ul.log .success { color: var(--ok); }
+  ul.log .warn { color: var(--warn); }
+  ul.log .error { color: var(--danger); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .offline { color: var(--danger); font-size: 13px; display: none; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pengiriman Tracer Study via WhatsApp</h1>
+  <div class="status" id="status" aria-live="polite">
+    <strong id="statusText">Memuat…</strong>
+    <span id="statusSub"></span>
+  </div>
+  <div class="alert" id="alert" role="alert"></div>
+
+  <div class="grid">
+    <section aria-labelledby="devTitle">
+      <h2 id="devTitle">Nomor pengirim</h2>
+      <div id="qrBox" hidden>
+        <div class="qr"><img id="qrImg" alt="QR code untuk menautkan WhatsApp"></div>
+        <div class="hint">Di HP pengirim:
+          <ol><li>Buka WhatsApp, lalu Perangkat tertaut</li><li>Pilih Tautkan perangkat</li><li>Arahkan kamera ke kode ini</li></ol>
+        </div>
+      </div>
+      <p class="hint" id="devInfo"></p>
+      <div class="buttons">
+        <button id="btnReconnect" hidden>Hubungkan ulang</button>
+        <button id="btnLogout" class="danger">Logout</button>
+        <button id="btnReset" class="danger">Reset sesi</button>
+      </div>
+      <p class="offline" id="offline">Koneksi ke server terputus, mencoba lagi…</p>
+    </section>
+
+    <div class="stack">
+      <section aria-labelledby="qTitle">
+        <h2 id="qTitle">Antrean</h2>
+        <div class="counts">
+          <div><b id="cWaiting">0</b><small>Menunggu</small></div>
+          <div><b id="cActive">0</b><small>Diproses</small></div>
+          <div><b id="cDelayed">0</b><small>Ditunda</small></div>
+          <div><b id="cDone">0</b><small>Selesai</small></div>
+          <div><b id="cFailed">0</b><small>Error</small></div>
+        </div>
+        <div class="meta"><span>Kuota 24 jam terakhir</span><span><b id="quotaText">0 / 0</b></span></div>
+        <div class="meter" aria-hidden="true"><i id="quotaBar"></i></div>
+        <div class="meta">
+          <span id="windowText"></span>
+          <span id="scanText"></span>
+        </div>
+        <div class="buttons">
+          <button id="btnToggle" class="primary">Jeda antrean</button>
+          <button id="btnScan">Periksa sheet sekarang</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="aTitle">
+        <h2 id="aTitle">Aktivitas</h2>
+        <ul class="log" id="log"></ul>
+        <p class="empty" id="logEmpty">Belum ada aktivitas sejak server dinyalakan.</p>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const COLORS = { connected: 'var(--ok)', qr: 'var(--accent)', connecting: 'var(--warn)', reconnecting: 'var(--warn)', disconnected: 'var(--muted)', logged_out: 'var(--danger)', halted: 'var(--danger)' };
+const LABELS = {
+  connected: (s) => [`Terhubung sebagai +${s.me}`, ''],
+  qr: () => ['Menunggu scan QR', 'Tautkan nomor pengirim untuk memulai'],
+  connecting: () => ['Menghubungkan…', ''],
+  reconnecting: () => ['Menyambung ulang…', 'Antrean dijeda sementara'],
+  disconnected: () => ['Tidak terhubung', ''],
+  logged_out: () => ['Sesi logout', 'Antrean dihentikan'],
+  halted: () => ['Koneksi dihentikan', 'Antrean dihentikan'],
+};
+let paused = false;
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+function renderWA(s) {
+  const [title, sub] = (LABELS[s.status] || LABELS.disconnected)(s);
+  $('status').style.setProperty('--state', COLORS[s.status] || 'var(--muted)');
+  $('statusText').textContent = title;
+  $('statusSub').textContent = sub;
+  $('qrBox').hidden = !(s.status === 'qr' && s.qr);
+  if (s.qr) $('qrImg').src = s.qr;
+  $('devInfo').textContent = s.status === 'connected'
+    ? 'Sesi tersimpan di server, jadi tetap login setelah restart.'
+    : s.status === 'qr' ? '' : 'QR akan muncul di sini bila nomor belum tertaut.';
+  $('btnReconnect').hidden = s.status !== 'halted';
+  $('btnLogout').hidden = s.status !== 'connected';
+  const a = $('alert');
+  a.style.display = s.alert ? 'block' : 'none';
+  a.className = 'alert' + (s.status === 'reconnecting' ? ' warn' : '');
+  a.textContent = s.alert || '';
+}
+
+function renderStats(st) {
+  if (!st) return;
+  const q = st.queue;
+  $('cWaiting').textContent = (q.waiting || 0) + (q.paused || 0);
+  $('cActive').textContent = q.active || 0;
+  $('cDelayed').textContent = q.delayed || 0;
+  $('cDone').textContent = q.completed || 0;
+  $('cFailed').textContent = q.failed || 0;
+  $('quotaText').textContent = `${st.quota.used} / ${st.quota.limit}`;
+  $('quotaBar').style.width = Math.min(100, (st.quota.used / st.quota.limit) * 100) + '%';
+  const w = st.window;
+  $('windowText').textContent = (w.start === 0 && w.end === 24) ? 'Kirim kapan saja'
+    : `Jam kirim ${String(w.start).padStart(2, '0')}.00–${String(w.end).padStart(2, '0')}.00 ${w.open ? '(sedang buka)' : '(sedang tutup)'}`;
+  $('scanText').textContent = st.lastScanAt ? `Sheet diperiksa ${fmtTime(st.lastScanAt)}` : '';
+  paused = q.manualPause;
+  $('btnToggle').textContent = paused ? 'Lanjutkan antrean' : 'Jeda antrean';
+}
+
+function addLog(e, prepend = true) {
+  const li = document.createElement('li');
+  const t = document.createElement('time'); t.dateTime = e.at; t.textContent = fmtTime(e.at);
+  const m = document.createElement('span'); m.className = e.level; m.textContent = e.message;
+  li.append(t, m);
+  const log = $('log');
+  prepend ? log.prepend(li) : log.append(li);
+  while (log.children.length > 80) log.lastChild.remove();
+  $('logEmpty').hidden = true;
+}
+
+function connect() {
+  const es = new EventSource('/events');
+  es.addEventListener('open', () => { $('offline').style.display = 'none'; });
+  es.addEventListener('error', () => { $('offline').style.display = 'block'; });
+  es.addEventListener('wa', (ev) => renderWA(JSON.parse(ev.data)));
+  es.addEventListener('stats', (ev) => renderStats(JSON.parse(ev.data)));
+  es.addEventListener('activity', (ev) => addLog(JSON.parse(ev.data)));
+  es.addEventListener('activity-list', (ev) => {
+    $('log').innerHTML = '';
+    const list = JSON.parse(ev.data);
+    list.forEach((e) => addLog(e, false));
+    $('logEmpty').hidden = list.length > 0;
+  });
+}
+
+async function post(url, btn, confirmText) {
+  if (confirmText && !confirm(confirmText)) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'X-Dashboard': '1' } });
+    if (!r.ok) alert((await r.json().catch(() => ({}))).error || `Gagal (${r.status})`);
+  } finally { btn.disabled = false; }
+}
+
+$('btnLogout').onclick = (e) => post('/api/logout', e.currentTarget, 'Logout nomor ini dari server? Antrean berhenti sampai QR baru discan.');
+$('btnReset').onclick = (e) => post('/api/reset-session', e.currentTarget, 'Hapus sesi tersimpan dan tampilkan QR baru?');
+$('btnReconnect').onclick = (e) => post('/api/reconnect', e.currentTarget);
+$('btnScan').onclick = (e) => post('/api/scan', e.currentTarget);
+$('btnToggle').onclick = (e) => post(paused ? '/api/queue/resume' : '/api/queue/pause', e.currentTarget);
+connect();
+</script>
+</body>
+</html>
