@@ -27,7 +27,7 @@ function requireDashboardHeader(req, res, next) {
   res.status(403).json({ error: 'Header X-Dashboard wajib' });
 }
 
-function createServer({ config, wa, producer, controls, getStats }, logger) {
+function createServer({ config, wa, producer, sources, controls, getStats }, logger) {
   const log = logger.child({ module: 'web' });
   const app = express();
   app.disable('x-powered-by');
@@ -62,6 +62,7 @@ function createServer({ config, wa, producer, controls, getStats }, logger) {
     });
     res.flushHeaders();
     clients.add(res);
+    send(res, 'info', { sheetUrl: `https://docs.google.com/spreadsheets/d/${config.sheets.spreadsheetId}/edit` });
     send(res, 'wa', wa.state);
     send(res, 'activity-list', recentActivity());
     send(res, 'stats', await getStats().catch(() => null));
@@ -92,6 +93,25 @@ function createServer({ config, wa, producer, controls, getStats }, logger) {
   app.post('/api/queue/pause', requireDashboardHeader, action(() => controls.pause()));
   app.post('/api/queue/resume', requireDashboardHeader, action(() => controls.resume()));
   app.post('/api/scan', requireDashboardHeader, action(() => producer.scan('manual')));
+
+  // ── Sumber data: pilihan sheet aktif ──
+  app.get('/api/sheets', async (req, res) => {
+    try {
+      res.json(await sources.describe(req.query.refresh === '1'));
+    } catch (err) {
+      log.error({ err }, 'Gagal memuat daftar sheet');
+      res.status(502).json({ error: `Gagal memuat daftar sheet: ${err.message}` });
+    }
+  });
+  app.post('/api/sheets', requireDashboardHeader, async (req, res) => {
+    try {
+      await sources.set(req.body?.sheets);
+      producer.trigger('ganti sheet');
+      res.json(await sources.describe());
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
 
   return app;
 }

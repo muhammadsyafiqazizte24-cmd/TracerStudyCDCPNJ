@@ -12,7 +12,12 @@ const {
   fetchLatestBaileysVersion,
   DisconnectReason,
   Browsers,
+  proto,
 } = baileys;
+
+/** Salinan pesan keluar untuk retry receipt (HP pengirim/penerima minta kirim ulang saat gagal dekripsi). */
+const MSG_KEY = (id) => `wa:msg:${id}`;
+const MSG_TTL_SEC = 3 * 24 * 3600;
 
 /** Kode disconnect yang tidak boleh di-reconnect otomatis (hindari loop). */
 const HALT_CODES = new Set([
@@ -26,8 +31,9 @@ const HALT_CODES = new Set([
  * status: disconnected | connecting | qr | connected | reconnecting | logged_out | halted
  */
 class WhatsAppClient extends EventEmitter {
-  constructor({ authDir, maxReconnectAttempts }, logger) {
+  constructor({ authDir, maxReconnectAttempts, redis }, logger) {
     super();
+    this.redis = redis;
     this.authDir = authDir;
     this.maxReconnect = maxReconnectAttempts;
     this.log = logger.child({ module: 'whatsapp' });
@@ -37,7 +43,7 @@ class WhatsAppClient extends EventEmitter {
     this.gen = 0; // generasi socket; event dari socket lama diabaikan
     this.reconnectAttempts = 0;
     this.reconnectTimer = null;
-    this.state = { status: 'disconnected', me: null, qr: null, alert: null, updatedAt: new Date().toISOString() };
+    this.state = { status: 'disconnected', me: null, name: null, qr: null, alert: null, updatedAt: new Date().toISOString() };
   }
 
   _set(patch) {
@@ -80,10 +86,17 @@ class WhatsAppClient extends EventEmitter {
       markOnlineOnConnect: false,
       syncFullHistory: false,
       generateHighQualityLinkPreview: false,
+      // Tanpa ini, HP pengirim sendiri menampilkan "Menunggu pesan ini" karena
+      // Baileys tidak bisa memenuhi permintaan kirim ulang (retry receipt).
+      getMessage: (key) => this._loadMessage(key.id),
     });
     this.sock = sock;
 
     sock.ev.on('creds.update', saveCreds);
+    // pushName sering baru datang setelah koneksi "open"
+    sock.ev.on('creds.update', ({ me }) => {
+      if (gen === this.gen && me?.name && me.name !== this.state.name) this._set({ name: me.name });
+    });
     sock.ev.on('connection.update', (update) => {
       if (gen !== this.gen) return;
       this._onUpdate(update, sock).catch((err) => this.log.error({ err }, 'connection.update handler error'));
@@ -99,8 +112,9 @@ class WhatsAppClient extends EventEmitter {
     if (connection === 'open') {
       this.reconnectAttempts = 0;
       const me = String(sock.user?.id || '').split(/[:@]/)[0] || null;
-      this._set({ status: 'connected', me, qr: null, alert: null });
-      this.log.info({ me }, 'WhatsApp terhubung');
+      const name = sock.user?.name || this.creds?.me?.name || null;
+      this._set({ status: 'connected', me, name, qr: null, alert: null });
+      this.log.info({ me, name }, 'WhatsApp terhubung');
       this.emit('open');
       return;
     }
@@ -114,7 +128,7 @@ class WhatsAppClient extends EventEmitter {
 
     if (code === DisconnectReason.loggedOut) {
       this._set({
-        status: 'logged_out', me: null, qr: null,
+        status: 'logged_out', me: null, name: null, qr: null,
         alert: 'Sesi WhatsApp dikeluarkan oleh server atau dari HP. Antrean dihentikan. Pilih "Reset sesi" untuk scan QR baru.',
       });
       this.emit('logged_out');
@@ -178,7 +192,7 @@ class WhatsAppClient extends EventEmitter {
     this._end();
     await fs.rm(this.authDir, { recursive: true, force: true });
     this.reconnectAttempts = 0;
-    this._set({ status: 'disconnected', me: null, qr: null, alert: null });
+    this._set({ status: 'disconnected', me: null, name: null, qr: null, alert: null });
     await this._connect();
   }
 
@@ -210,7 +224,32 @@ class WhatsAppClient extends EventEmitter {
     await sock.sendPresenceUpdate('paused', jid);
     await sleep(randInt(s.pauseMinMs, s.pauseMaxMs));
     if (this.sock !== sock) throw new Error('Koneksi WhatsApp berganti saat akan mengirim');
-    return sock.sendMessage(jid, { text });
+    const sent = await sock.sendMessage(jid, { text });
+    await this._storeMessage(sent);
+    return sent;
+  }
+
+  async _storeMessage(sent) {
+    if (!this.redis || !sent?.key?.id || !sent.message) return;
+    try {
+      const bin = proto.Message.encode(sent.message).finish();
+      await this.redis.set(MSG_KEY(sent.key.id), Buffer.from(bin).toString('base64'), 'EX', MSG_TTL_SEC);
+    } catch (err) {
+      this.log.warn({ err, id: sent.key.id }, 'Gagal menyimpan salinan pesan untuk retry');
+    }
+  }
+
+  async _loadMessage(id) {
+    if (!this.redis || !id) return undefined;
+    try {
+      const b64 = await this.redis.get(MSG_KEY(id));
+      if (!b64) return undefined;
+      this.log.info({ id }, 'Permintaan kirim ulang (retry) dilayani');
+      return proto.Message.decode(Buffer.from(b64, 'base64'));
+    } catch (err) {
+      this.log.warn({ err, id }, 'Gagal memuat salinan pesan untuk retry');
+      return undefined;
+    }
   }
 }
 

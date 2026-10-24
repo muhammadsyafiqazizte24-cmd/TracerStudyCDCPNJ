@@ -8,6 +8,7 @@ const { sleep, randInt, formatLocal, msUntilSendWindow } = require('../utils/tim
 
 const LAST_ACTION_KEY = 'wa:last_action_at';
 const sentKey = (jobId) => `wa:sent:${jobId}`;
+const where = (sheet, rowNumber) => (sheet ? `${sheet} baris ${rowNumber}` : `baris ${rowNumber}`);
 
 /** Error yang tidak perlu di-retry (job ditutup sebagai Gagal). */
 class PermanentError extends Error {}
@@ -24,18 +25,18 @@ function createWorker({ config, connection, redis, wa, sheets }, logger) {
     throw new DelayedError(); // tidak dihitung sebagai attempt
   }
 
-  async function safeSheetUpdate(rowNumber, fields) {
+  async function safeSheetUpdate(sheet, rowNumber, fields) {
     try {
-      await sheets.update(rowNumber, fields);
+      await sheets.update(sheet || sheets.defaultSheet, rowNumber, fields);
     } catch (err) {
       // Jangan pernah throw di sini: gagal update sheet tidak boleh memicu kirim ulang.
-      log.error({ err, rowNumber, fields }, 'Update spreadsheet gagal');
-      activity('error', `Pesan baris ${rowNumber} sudah diproses tetapi update sheet gagal: ${err.message}`);
+      log.error({ err, sheet, rowNumber, fields }, 'Update spreadsheet gagal');
+      activity('error', `Pesan ${where(sheet, rowNumber)} sudah diproses tetapi update sheet gagal: ${err.message}`);
     }
   }
 
-  async function markSent(job, rowNumber) {
-    await safeSheetUpdate(rowNumber, { status: STATUS.SENT, sentAt: formatLocal(new Date(), S.timezone), detail: '' });
+  async function markSent(row) {
+    await safeSheetUpdate(row.sheet, row.rowNumber, { status: STATUS.SENT, sentAt: formatLocal(new Date(), S.timezone), detail: '' });
   }
 
   async function ensureConnected(job, token) {
@@ -50,7 +51,7 @@ function createWorker({ config, connection, redis, wa, sheets }, logger) {
     // 0. Idempotensi: pesan sudah terkirim tetapi job belum sempat selesai (crash/restart)
     if (await redis.exists(sentKey(job.id))) {
       const { row } = await sheets.locate(job.data);
-      if (row) await markSent(job, row.rowNumber);
+      if (row) await markSent(row);
       return { skipped: 'already-sent' };
     }
 
@@ -102,8 +103,8 @@ function createWorker({ config, connection, redis, wa, sheets }, logger) {
     await quota.record(redis, job.id);
 
     // 7. Callback ke spreadsheet
-    await markSent(job, row.rowNumber);
-    activity('success', `Terkirim ke ${name} (baris ${row.rowNumber})`);
+    await markSent(row);
+    activity('success', `Terkirim ke ${name} (${where(row.sheet, row.rowNumber)})`);
     return { sentAt: now };
   }
 
@@ -117,7 +118,7 @@ function createWorker({ config, connection, redis, wa, sheets }, logger) {
         if (err instanceof PermanentError) {
           // Tutup job tanpa retry
           const { row } = await sheets.locate(job.data).catch(() => ({}));
-          await safeSheetUpdate(row?.rowNumber ?? job.data.rowNumber, { status: STATUS.FAILED, sentAt: '', detail: err.message });
+          await safeSheetUpdate(row?.sheet ?? job.data.sheet, row?.rowNumber ?? job.data.rowNumber, { status: STATUS.FAILED, sentAt: '', detail: err.message });
           activity('warn', `Gagal ke ${job.data.name}: ${err.message}`);
           return { failed: err.message };
         }
@@ -141,7 +142,7 @@ function createWorker({ config, connection, redis, wa, sheets }, logger) {
       return;
     }
     const { row } = await sheets.locate(job.data).catch(() => ({}));
-    await safeSheetUpdate(row?.rowNumber ?? job.data.rowNumber, {
+    await safeSheetUpdate(row?.sheet ?? job.data.sheet, row?.rowNumber ?? job.data.rowNumber, {
       status: STATUS.FAILED, sentAt: '', detail: String(err?.message || 'Error tidak diketahui').slice(0, 200),
     });
     activity('error', `Gagal permanen ke ${job.data.name}: ${err?.message}`);

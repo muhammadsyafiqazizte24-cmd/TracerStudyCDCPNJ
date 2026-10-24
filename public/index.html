@@ -3,102 +3,206 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pengiriman Tracer Study</title>
+<title>Tracer Study PNJ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light;
-    --bg: #EEF2F0; --panel: #FFFFFF; --ink: #17252E; --muted: #5B6B73; --line: #D5DDDA;
-    --accent: #1C6E8C; --ok: #2F7D4F; --warn: #A86A12; --danger: #B0383A;
-    --ok-soft: #E3F1E8; --warn-soft: #F7EEDC; --danger-soft: #F6E3E3; --accent-soft: #E1EEF3;
+    --bg: #F3F5F4; --panel: #FFFFFF; --ink: #142028; --muted: #64737B; --line: #E2E8E5;
+    --accent: #0F766E; --accent-ink: #FFFFFF; --accent-soft: #DDF2EF;
+    --ok: #15803D; --warn: #B45309; --danger: #B91C1C;
+    --ok-soft: #DCF5E4; --warn-soft: #FDF0DC; --danger-soft: #FBE4E4;
+    --sheets: #188038; --sheets-soft: #E3F4E8;
+    --shadow: 0 1px 2px rgba(20,32,40,.05), 0 4px 16px rgba(20,32,40,.05);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       color-scheme: dark;
-      --bg: #0F1A1F; --panel: #16242B; --ink: #E3EBEE; --muted: #93A5AD; --line: #2A3B43;
-      --accent: #5BB0CF; --ok: #5FBF85; --warn: #E0A84A; --danger: #E57373;
-      --ok-soft: #173327; --warn-soft: #3A2D14; --danger-soft: #3B1C1E; --accent-soft: #173341;
+      --bg: #0D1417; --panel: #151F23; --ink: #E6EDEF; --muted: #8FA1A8; --line: #24323A;
+      --accent: #2DD4BF; --accent-ink: #062A26; --accent-soft: #123A36;
+      --ok: #4ADE80; --warn: #FBBF24; --danger: #F87171;
+      --ok-soft: #133224; --warn-soft: #3A2C10; --danger-soft: #3A1A1A;
+      --sheets: #4CC36F; --sheets-soft: #15301E;
+      --shadow: 0 1px 2px rgba(0,0,0,.3);
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
-    font: 400 15px/1.55 "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font: 400 15px/1.55 "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   }
-  main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 48px; }
-  h1 { font-size: 15px; font-weight: 600; color: var(--muted); margin: 0 0 6px; }
-  h2 { font-size: 17px; font-weight: 600; margin: 0 0 14px; }
 
-  .status {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    border-left: 6px solid var(--state, var(--muted)); padding: 6px 0 6px 16px; margin-bottom: 24px;
+  /* ── Top bar ── */
+  header.top {
+    position: sticky; top: 0; z-index: 5;
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
   }
-  .status strong { font-size: clamp(24px, 4vw, 34px); font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
-  .status span { color: var(--muted); }
+  .top-in { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none;
+    background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 14px;
+  }
+  .brand b { display: block; font-size: 15px; font-weight: 700; line-height: 1.2; }
+  .brand small { color: var(--muted); font-size: 12.5px; }
+  .pill {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    background: var(--pill-bg, var(--line)); color: var(--pill-ink, var(--muted)); white-space: nowrap;
+  }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .pill.live i { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 20px 48px; }
+
   .alert {
-    background: var(--danger-soft); color: var(--danger); border-radius: 6px;
-    padding: 12px 14px; margin: -8px 0 22px; font-weight: 500; display: none;
+    background: var(--danger-soft); color: var(--danger); border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 20px; font-weight: 500;
   }
   .alert.warn { background: var(--warn-soft); color: var(--warn); }
 
-  .grid { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
-  .stack > * + * { margin-top: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 15px; font-weight: 700; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .card h2 small { margin-left: auto; font-weight: 500; color: var(--muted); font-size: 13px; }
 
-  .qr { display: grid; place-items: center; background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
-  .qr img { width: 100%; max-width: 280px; image-rendering: pixelated; }
+  /* ── Hero: akun + shortcut spreadsheet ── */
+  .hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .account { display: flex; align-items: center; gap: 16px; }
+  .avatar {
+    width: 64px; height: 64px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-size: 22px; font-weight: 800; color: var(--accent-ink); background: var(--accent);
+    box-shadow: 0 0 0 4px var(--panel), 0 0 0 7px var(--state, var(--line));
+  }
+  .account small { display: block; color: var(--muted); font-size: 13px; font-weight: 500; }
+  .account strong { display: block; font-size: clamp(20px, 3vw, 26px); font-weight: 800; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
+  .account span { color: var(--muted); font-size: 14px; }
+
+  a.app {
+    display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit;
+    transition: transform .15s, border-color .15s;
+  }
+  a.app:hover { transform: translateY(-2px); border-color: var(--sheets); }
+  a.app:focus-visible { outline: 3px solid var(--sheets); outline-offset: 2px; }
+  a.app[aria-disabled="true"] { pointer-events: none; opacity: .6; }
+  .app-icon { width: 52px; height: 52px; border-radius: 14px; flex: none; display: grid; place-items: center; background: var(--sheets-soft); color: var(--sheets); }
+  .app b { display: block; font-size: 16px; font-weight: 700; }
+  .app small { color: var(--muted); font-size: 13px; }
+  .app .go { margin-left: auto; color: var(--sheets); flex: none; }
+
+  /* ── Layout bawah ── */
+  .grid { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 16px; align-items: start; }
+  .stack > * + * { margin-top: 16px; }
+  @media (max-width: 860px) { .grid, .hero { grid-template-columns: 1fr; } }
+
+  .qr { display: grid; place-items: center; background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 14px; border: 1px solid var(--line); }
+  .qr img { width: 100%; max-width: 260px; image-rendering: pixelated; }
   .hint { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
   .hint ol { padding-left: 18px; margin: 6px 0 0; }
 
   .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
   button {
     font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
-    border-radius: 6px; padding: 8px 14px; border: 1px solid var(--line);
-    background: var(--panel); color: var(--ink);
+    border-radius: 10px; padding: 9px 16px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--ink); transition: background .15s, border-color .15s;
   }
   button:hover { border-color: var(--muted); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  button.primary:hover { filter: brightness(1.08); }
   button.danger { color: var(--danger); }
+  button.danger:hover { background: var(--danger-soft); border-color: var(--danger-soft); }
   button:disabled { opacity: .5; cursor: progress; }
   button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-  .counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-bottom: 18px; }
-  .counts div { padding: 4px 12px; border-left: 1px solid var(--line); }
-  .counts div:first-child { border-left: 0; padding-left: 0; }
-  .counts b { display: block; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .counts small { color: var(--muted); font-size: 13px; }
-  @media (max-width: 520px) { .counts { grid-template-columns: repeat(3, 1fr); row-gap: 12px; } .counts div:nth-child(4) { border-left: 0; padding-left: 0; } }
+  /* ── Statistik ── */
+  .counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+  .counts div { background: var(--bg); border-radius: 12px; padding: 12px 14px; }
+  .counts b { display: block; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .counts small { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .counts .c-ok b { color: var(--ok); }
+  .counts .c-err b { color: var(--danger); }
+  @media (max-width: 560px) { .counts { grid-template-columns: repeat(2, 1fr); } }
 
-  .meter { margin: 4px 0 6px; height: 8px; background: var(--accent-soft); border-radius: 4px; overflow: hidden; }
-  .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s; }
-  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 14px; margin-bottom: 16px; }
-  .meta b { color: var(--ink); font-weight: 600; }
+  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 14px; }
+  .meta b { color: var(--ink); font-weight: 700; }
+  .meter { margin: 8px 0 16px; height: 10px; background: var(--accent-soft); border-radius: 999px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .4s; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .chip { font-size: 13px; padding: 5px 11px; border-radius: 999px; background: var(--bg); color: var(--muted); font-weight: 500; }
+  .chip.open { background: var(--ok-soft); color: var(--ok); }
+  .chip.closed { background: var(--warn-soft); color: var(--warn); }
 
-  ul.log { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
-  ul.log li { display: grid; grid-template-columns: 64px 1fr; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  /* ── Aktivitas ── */
+  ul.log { list-style: none; margin: 0; padding: 0; max-height: 440px; overflow-y: auto; }
+  ul.log li { display: grid; grid-template-columns: 10px 48px 1fr; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
   ul.log li:first-child { border-top: 0; }
-  ul.log time { color: var(--muted); font-variant-numeric: tabular-nums; }
-  ul.log .success { color: var(--ok); }
-  ul.log .warn { color: var(--warn); }
-  ul.log .error { color: var(--danger); font-weight: 500; }
-  .empty { color: var(--muted); font-size: 14px; }
-  .offline { color: var(--danger); font-size: 13px; display: none; margin-top: 8px; }
+  ul.log li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); align-self: center; }
+  ul.log li.success::before { background: var(--ok); }
+  ul.log li.warn::before { background: var(--warn); }
+  ul.log li.error::before { background: var(--danger); }
+  ul.log time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+  ul.log li.error span { color: var(--danger); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 14px; margin: 0; }
+  .offline { color: var(--danger); font-size: 13px; display: none; margin: 10px 0 0; }
+
+  /* ── Sumber data ── */
+  button.link { border: 0; padding: 0; background: none; color: var(--accent); font-size: 13px; font-weight: 600; }
+  button.link:hover { text-decoration: underline; }
+  ul.sheets { list-style: none; margin: 0 0 14px; padding: 0; max-height: 300px; overflow-y: auto; }
+  ul.sheets li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; }
+  ul.sheets li:hover { background: var(--bg); }
+  ul.sheets label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+  ul.sheets label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  ul.sheets input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; margin: 0; }
+  ul.sheets li.bad label { cursor: not-allowed; color: var(--muted); }
+  ul.sheets .tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--muted); flex: none; }
+  ul.sheets .tag.bad { background: var(--warn-soft); color: var(--warn); }
+  ul.sheets a { color: var(--muted); display: grid; place-items: center; flex: none; padding: 2px; border-radius: 6px; }
+  ul.sheets a:hover { color: var(--sheets); }
+  .sheet-warn { color: var(--warn); font-size: 13px; margin: 0 0 14px; }
+
+  footer.credit { text-align: center; color: var(--muted); font-size: 13px; padding: 0 20px 28px; margin-top: -24px; }
+  footer.credit b { color: var(--ink); font-weight: 700; }
+  @media (max-width: 560px) { .brand small { display: none; } .brand b { font-size: 14px; } }
 </style>
 </head>
 <body>
-<main>
-  <h1>Pengiriman Tracer Study via WhatsApp</h1>
-  <div class="status" id="status" aria-live="polite">
-    <strong id="statusText">Memuat…</strong>
-    <span id="statusSub"></span>
+<header class="top">
+  <div class="top-in">
+    <div class="logo" aria-hidden="true">TS</div>
+    <div class="brand"><b>Tracer Study Politeknik Negeri Jakarta</b><small>Pengiriman WhatsApp otomatis</small></div>
+    <span class="pill" id="pill"><i></i><span id="pillText">Memuat…</span></span>
   </div>
-  <div class="alert" id="alert" role="alert"></div>
+</header>
+
+<main>
+  <div class="alert" id="alert" role="alert" hidden></div>
+
+  <div class="hero">
+    <div class="card account" id="status" aria-live="polite">
+      <div class="avatar" id="avatar" aria-hidden="true">?</div>
+      <div>
+        <small id="statusLabel">Status</small>
+        <strong id="statusText">Memuat…</strong>
+        <span id="statusSub"></span>
+      </div>
+    </div>
+
+    <a class="card app" id="sheetLink" href="#" target="_blank" rel="noopener" aria-disabled="true">
+      <div class="app-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 12h8v6H8zM8 15h8M12 12v6"/></svg>
+      </div>
+      <div><b>Buka Spreadsheet</b><small>Data alumni &amp; status kirim di Google Sheets</small></div>
+      <svg class="go" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+    </a>
+  </div>
 
   <div class="grid">
-    <section aria-labelledby="devTitle">
+    <div class="stack">
+    <section class="card" aria-labelledby="devTitle">
       <h2 id="devTitle">Nomor pengirim</h2>
       <div id="qrBox" hidden>
         <div class="qr"><img id="qrImg" alt="QR code untuk menautkan WhatsApp"></div>
@@ -115,21 +219,34 @@
       <p class="offline" id="offline">Koneksi ke server terputus, mencoba lagi…</p>
     </section>
 
+    <section class="card" aria-labelledby="srcTitle">
+      <h2 id="srcTitle">Sumber data <small><button class="link" id="btnRefreshSheets">Muat ulang</button></small></h2>
+      <p class="hint">Centang sheet yang dipindai. Hanya baris berstatus “Kirim Tracer” yang dikirim.</p>
+      <ul class="sheets" id="sheetList"></ul>
+      <p class="empty" id="sheetMsg">Memuat daftar sheet…</p>
+      <p class="sheet-warn" id="sheetMissing" hidden></p>
+      <div class="buttons">
+        <button id="btnAllSheets">Pilih semua</button>
+        <button id="btnSaveSheets" class="primary" disabled>Simpan</button>
+      </div>
+    </section>
+    </div>
+
     <div class="stack">
-      <section aria-labelledby="qTitle">
-        <h2 id="qTitle">Antrean</h2>
+      <section class="card" aria-labelledby="qTitle">
+        <h2 id="qTitle">Antrean <small id="scanText"></small></h2>
         <div class="counts">
           <div><b id="cWaiting">0</b><small>Menunggu</small></div>
           <div><b id="cActive">0</b><small>Diproses</small></div>
           <div><b id="cDelayed">0</b><small>Ditunda</small></div>
-          <div><b id="cDone">0</b><small>Selesai</small></div>
-          <div><b id="cFailed">0</b><small>Error</small></div>
+          <div class="c-ok"><b id="cDone">0</b><small>Selesai</small></div>
+          <div class="c-err"><b id="cFailed">0</b><small>Error</small></div>
         </div>
         <div class="meta"><span>Kuota 24 jam terakhir</span><span><b id="quotaText">0 / 0</b></span></div>
         <div class="meter" aria-hidden="true"><i id="quotaBar"></i></div>
-        <div class="meta">
-          <span id="windowText"></span>
-          <span id="scanText"></span>
+        <div class="chips">
+          <span class="chip" id="windowText"></span>
+          <span class="chip" id="pauseChip" hidden>Dijeda manual</span>
         </div>
         <div class="buttons">
           <button id="btnToggle" class="primary">Jeda antrean</button>
@@ -137,7 +254,7 @@
         </div>
       </section>
 
-      <section aria-labelledby="aTitle">
+      <section class="card" aria-labelledby="aTitle">
         <h2 id="aTitle">Aktivitas</h2>
         <ul class="log" id="log"></ul>
         <p class="empty" id="logEmpty">Belum ada aktivitas sejak server dinyalakan.</p>
@@ -145,27 +262,44 @@
     </div>
   </div>
 </main>
+<footer class="credit">Created by <b>CDC PNJ</b></footer>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const COLORS = { connected: 'var(--ok)', qr: 'var(--accent)', connecting: 'var(--warn)', reconnecting: 'var(--warn)', disconnected: 'var(--muted)', logged_out: 'var(--danger)', halted: 'var(--danger)' };
+const TONES = {
+  connected: ['var(--ok)', 'var(--ok-soft)'], qr: ['var(--accent)', 'var(--accent-soft)'],
+  connecting: ['var(--warn)', 'var(--warn-soft)'], reconnecting: ['var(--warn)', 'var(--warn-soft)'],
+  disconnected: ['var(--muted)', 'var(--line)'], logged_out: ['var(--danger)', 'var(--danger-soft)'], halted: ['var(--danger)', 'var(--danger-soft)'],
+};
+const displayName = (s) => s.name || (s.me ? `+${s.me}` : 'WhatsApp');
 const LABELS = {
-  connected: (s) => [`Terhubung sebagai +${s.me}`, ''],
-  qr: () => ['Menunggu scan QR', 'Tautkan nomor pengirim untuk memulai'],
-  connecting: () => ['Menghubungkan…', ''],
-  reconnecting: () => ['Menyambung ulang…', 'Antrean dijeda sementara'],
-  disconnected: () => ['Tidak terhubung', ''],
-  logged_out: () => ['Sesi logout', 'Antrean dihentikan'],
-  halted: () => ['Koneksi dihentikan', 'Antrean dihentikan'],
+  connected: (s) => ['Terhubung sebagai', displayName(s), '', 'Terhubung'],
+  qr: () => ['Belum tertaut', 'Menunggu scan QR', 'Tautkan nomor pengirim untuk memulai', 'Scan QR'],
+  connecting: () => ['Status', 'Menghubungkan…', '', 'Menghubungkan'],
+  reconnecting: () => ['Status', 'Menyambung ulang…', 'Antrean dijeda sementara', 'Menyambung ulang'],
+  disconnected: () => ['Status', 'Tidak terhubung', '', 'Terputus'],
+  logged_out: () => ['Status', 'Sesi logout', 'Antrean dihentikan', 'Logout'],
+  halted: () => ['Status', 'Koneksi dihentikan', 'Antrean dihentikan', 'Berhenti'],
+};
+const initials = (n) => {
+  const w = String(n).replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/).filter(Boolean);
+  return ((w[0]?.[0] || '') + (w[1]?.[0] || '')).toUpperCase() || 'WA';
 };
 let paused = false;
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
 function renderWA(s) {
-  const [title, sub] = (LABELS[s.status] || LABELS.disconnected)(s);
-  $('status').style.setProperty('--state', COLORS[s.status] || 'var(--muted)');
+  const [label, title, sub, pill] = (LABELS[s.status] || LABELS.disconnected)(s);
+  const [ink, soft] = TONES[s.status] || TONES.disconnected;
+  $('status').style.setProperty('--state', ink);
+  $('statusLabel').textContent = label;
   $('statusText').textContent = title;
   $('statusSub').textContent = sub;
+  $('avatar').textContent = s.status === 'connected' ? initials(displayName(s)) : 'WA';
+  $('pill').style.setProperty('--pill-ink', ink);
+  $('pill').style.setProperty('--pill-bg', soft);
+  $('pill').classList.toggle('live', s.status === 'connected');
+  $('pillText').textContent = pill;
   $('qrBox').hidden = !(s.status === 'qr' && s.qr);
   if (s.qr) $('qrImg').src = s.qr;
   $('devInfo').textContent = s.status === 'connected'
@@ -174,7 +308,7 @@ function renderWA(s) {
   $('btnReconnect').hidden = s.status !== 'halted';
   $('btnLogout').hidden = s.status !== 'connected';
   const a = $('alert');
-  a.style.display = s.alert ? 'block' : 'none';
+  a.hidden = !s.alert;
   a.className = 'alert' + (s.status === 'reconnecting' ? ' warn' : '');
   a.textContent = s.alert || '';
 }
@@ -190,17 +324,119 @@ function renderStats(st) {
   $('quotaText').textContent = `${st.quota.used} / ${st.quota.limit}`;
   $('quotaBar').style.width = Math.min(100, (st.quota.used / st.quota.limit) * 100) + '%';
   const w = st.window;
-  $('windowText').textContent = (w.start === 0 && w.end === 24) ? 'Kirim kapan saja'
-    : `Jam kirim ${String(w.start).padStart(2, '0')}.00–${String(w.end).padStart(2, '0')}.00 ${w.open ? '(sedang buka)' : '(sedang tutup)'}`;
+  const always = w.start === 0 && w.end === 24;
+  $('windowText').textContent = always ? 'Kirim kapan saja'
+    : `Jam kirim ${String(w.start).padStart(2, '0')}.00–${String(w.end).padStart(2, '0')}.00 · ${w.open ? 'sedang buka' : 'sedang tutup'}`;
+  $('windowText').className = 'chip' + (always || w.open ? ' open' : ' closed');
   $('scanText').textContent = st.lastScanAt ? `Sheet diperiksa ${fmtTime(st.lastScanAt)}` : '';
   paused = q.manualPause;
+  $('pauseChip').hidden = !paused;
   $('btnToggle').textContent = paused ? 'Lanjutkan antrean' : 'Jeda antrean';
 }
 
+let sheetUrl = '';
+function renderInfo(info) {
+  if (!info?.sheetUrl) return;
+  sheetUrl = info.sheetUrl;
+  $('sheetLink').href = info.sheetUrl;
+  $('sheetLink').removeAttribute('aria-disabled');
+  if (sheetData) renderSheets(sheetData);
+}
+
+// ── Sumber data ──
+let sheetData = null;
+let savedSheets = [];
+const checkedSheets = () => [...$('sheetList').querySelectorAll('input:checked')].map((i) => i.value);
+const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+
+function syncSheetButtons() {
+  const checked = checkedSheets();
+  $('btnSaveSheets').disabled = sameSet(checked, savedSheets);
+  const selectable = $('sheetList').querySelectorAll('input:not(:disabled)');
+  const all = selectable.length > 0 && checked.length === selectable.length;
+  $('btnAllSheets').textContent = all ? 'Kosongkan' : 'Pilih semua';
+}
+
+function renderSheets(data) {
+  sheetData = data;
+  savedSheets = data.sheets.filter((s) => s.active).map((s) => s.title);
+  const list = $('sheetList');
+  list.innerHTML = '';
+  for (const s of data.sheets) {
+    const li = document.createElement('li');
+    if (!s.compatible) li.className = 'bad';
+    const label = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = s.title; cb.checked = s.active; cb.disabled = !s.compatible && !s.active;
+    cb.onchange = syncSheetButtons;
+    const name = document.createElement('span'); name.textContent = s.title; name.title = s.title;
+    label.append(cb, name);
+    li.append(label);
+    if (!s.compatible) {
+      const t = document.createElement('span'); t.className = 'tag bad'; t.textContent = 'Format beda';
+      t.title = 'Header baris 1 harus: kolom B "Nama", kolom E "Status"';
+      li.append(t);
+    } else if (s.hidden) {
+      const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Tersembunyi';
+      li.append(t);
+    }
+    if (sheetUrl) {
+      const a = document.createElement('a');
+      a.href = `${sheetUrl}#gid=${s.sheetId}`; a.target = '_blank'; a.rel = 'noopener';
+      a.title = `Buka sheet ${s.title}`; a.setAttribute('aria-label', `Buka sheet ${s.title}`);
+      a.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>';
+      li.append(a);
+    }
+    list.append(li);
+  }
+  $('sheetMsg').hidden = data.sheets.length > 0;
+  $('sheetMsg').textContent = 'Spreadsheet tidak berisi sheet.';
+  $('sheetMissing').hidden = !data.missing.length;
+  $('sheetMissing').textContent = data.missing.length
+    ? `Tidak ditemukan lagi (diganti nama/dihapus): ${data.missing.join(', ')}. Simpan ulang pilihan untuk membersihkannya.` : '';
+  syncSheetButtons();
+}
+
+async function loadSheets(refresh = false) {
+  $('btnRefreshSheets').disabled = true;
+  try {
+    const r = await fetch('/api/sheets' + (refresh ? '?refresh=1' : ''));
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || `Gagal (${r.status})`);
+    renderSheets(body);
+  } catch (err) {
+    $('sheetMsg').hidden = false;
+    $('sheetMsg').textContent = err.message;
+  } finally { $('btnRefreshSheets').disabled = false; }
+}
+
+$('btnRefreshSheets').onclick = () => loadSheets(true);
+$('btnAllSheets').onclick = () => {
+  const boxes = [...$('sheetList').querySelectorAll('input:not(:disabled)')];
+  const check = !boxes.every((b) => b.checked);
+  boxes.forEach((b) => { b.checked = check; });
+  syncSheetButtons();
+};
+$('btnSaveSheets').onclick = async (e) => {
+  const sheets = checkedSheets();
+  if (!sheets.length && !confirm('Tidak ada sheet yang dicentang, jadi tidak ada yang akan dipindai. Lanjutkan?')) return;
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/sheets', {
+      method: 'POST', headers: { 'X-Dashboard': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ sheets }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) { alert(body.error || `Gagal (${r.status})`); syncSheetButtons(); return; }
+    renderSheets(body);
+  } catch (err) { alert(err.message); syncSheetButtons(); }
+};
+
 function addLog(e, prepend = true) {
   const li = document.createElement('li');
+  li.className = e.level;
   const t = document.createElement('time'); t.dateTime = e.at; t.textContent = fmtTime(e.at);
-  const m = document.createElement('span'); m.className = e.level; m.textContent = e.message;
+  const m = document.createElement('span'); m.textContent = e.message;
   li.append(t, m);
   const log = $('log');
   prepend ? log.prepend(li) : log.append(li);
@@ -212,6 +448,7 @@ function connect() {
   const es = new EventSource('/events');
   es.addEventListener('open', () => { $('offline').style.display = 'none'; });
   es.addEventListener('error', () => { $('offline').style.display = 'block'; });
+  es.addEventListener('info', (ev) => renderInfo(JSON.parse(ev.data)));
   es.addEventListener('wa', (ev) => renderWA(JSON.parse(ev.data)));
   es.addEventListener('stats', (ev) => renderStats(JSON.parse(ev.data)));
   es.addEventListener('activity', (ev) => addLog(JSON.parse(ev.data)));
@@ -238,6 +475,7 @@ $('btnReconnect').onclick = (e) => post('/api/reconnect', e.currentTarget);
 $('btnScan').onclick = (e) => post('/api/scan', e.currentTarget);
 $('btnToggle').onclick = (e) => post(paused ? '/api/queue/resume' : '/api/queue/pause', e.currentTarget);
 connect();
+loadSheets();
 </script>
 </body>
 </html>

@@ -6,7 +6,8 @@ const { eqStatus } = require('../utils/text');
 const { sleep } = require('../utils/time');
 
 /**
- * Skema: A Timestamp | B Nama | C Jurusan | D No WA | E Status | F Waktu Terkirim | [G Keterangan]
+ * Skema tiap sheet: A Timestamp | B Nama | C Jurusan | D No WA | E Status | F Waktu Terkirim | [G Keterangan]
+ * Semua method menerima nama sheet; satu spreadsheet bisa berisi banyak sheet alumni.
  */
 class SheetsClient {
   constructor({ keyFile, spreadsheetId, sheetName, firstDataRow, detailColumn }, logger) {
@@ -16,15 +17,15 @@ class SheetsClient {
     });
     this.api = google.sheets({ version: 'v4', auth });
     this.spreadsheetId = spreadsheetId;
-    this.sheetName = sheetName;
+    this.defaultSheet = sheetName; // untuk job lama yang belum membawa nama sheet
     this.firstRow = firstDataRow;
     this.detailColumn = detailColumn || '';
     this.lastCol = this.detailColumn || 'F';
     this.log = logger.child({ module: 'sheets' });
   }
 
-  a1(ref) {
-    return `'${this.sheetName.replace(/'/g, "''")}'!${ref}`;
+  a1(sheet, ref) {
+    return `'${String(sheet).replace(/'/g, "''")}'!${ref}`;
   }
 
   async _retry(label, fn) {
@@ -42,9 +43,10 @@ class SheetsClient {
     }
   }
 
-  _toRow(values = [], rowNumber) {
+  _toRow(values = [], sheet, rowNumber) {
     const v = (i) => (values[i] ?? '');
     return {
+      sheet,
       rowNumber,
       name: String(v(1)).trim(),
       major: String(v(2)).trim(),
@@ -53,40 +55,81 @@ class SheetsClient {
     };
   }
 
-  async readAll() {
-    const res = await this._retry('readAll', () =>
-      this.api.spreadsheets.values.get({
+  /**
+   * Daftar sheet beserta kecocokan format (dicek dari baris header).
+   * @returns {Promise<Array<{title: string, sheetId: number, hidden: boolean, compatible: boolean}>>}
+   */
+  async listSheets() {
+    const meta = await this._retry('listSheets', () =>
+      this.api.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
-        range: this.a1(`A${this.firstRow}:${this.lastCol}`),
+        fields: 'sheets.properties(sheetId,title,index,hidden,sheetType)',
+      }),
+    );
+    const tabs = (meta.data.sheets || [])
+      .map((s) => s.properties)
+      .filter((p) => !p.sheetType || p.sheetType === 'GRID')
+      .sort((a, b) => a.index - b.index);
+    if (!tabs.length) return [];
+
+    let headers = [];
+    if (this.firstRow > 1) {
+      const headerRow = this.firstRow - 1;
+      const res = await this._retry('readHeaders', () =>
+        this.api.spreadsheets.values.batchGet({
+          spreadsheetId: this.spreadsheetId,
+          ranges: tabs.map((t) => this.a1(t.title, `A${headerRow}:${this.lastCol}${headerRow}`)),
+        }),
+      );
+      headers = (res.data.valueRanges || []).map((vr) => vr.values?.[0] || []);
+    }
+    return tabs.map((t, i) => ({
+      title: t.title,
+      sheetId: t.sheetId,
+      hidden: !!t.hidden,
+      compatible: this.firstRow <= 1 || isCompatibleHeader(headers[i] || []),
+    }));
+  }
+
+  /** Baca seluruh baris dari beberapa sheet sekaligus (satu request). */
+  async readAll(sheetNames) {
+    if (!sheetNames.length) return [];
+    const res = await this._retry('readAll', () =>
+      this.api.spreadsheets.values.batchGet({
+        spreadsheetId: this.spreadsheetId,
+        ranges: sheetNames.map((s) => this.a1(s, `A${this.firstRow}:${this.lastCol}`)),
         // UNFORMATTED agar nomor HP bertipe angka tidak berubah jadi 6.28E+12
         valueRenderOption: 'UNFORMATTED_VALUE',
         dateTimeRenderOption: 'FORMATTED_STRING',
       }),
     );
-    return (res.data.values || []).map((r, i) => this._toRow(r, this.firstRow + i));
+    const ranges = res.data.valueRanges || [];
+    return sheetNames.flatMap((sheet, i) =>
+      (ranges[i]?.values || []).map((r, j) => this._toRow(r, sheet, this.firstRow + j)),
+    );
   }
 
-  async readRow(rowNumber) {
+  async readRow(sheet, rowNumber) {
     const res = await this._retry('readRow', () =>
       this.api.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: this.a1(`A${rowNumber}:${this.lastCol}${rowNumber}`),
+        range: this.a1(sheet, `A${rowNumber}:${this.lastCol}${rowNumber}`),
         valueRenderOption: 'UNFORMATTED_VALUE',
       }),
     );
-    return this._toRow(res.data.values?.[0], rowNumber);
+    return this._toRow(res.data.values?.[0], sheet, rowNumber);
   }
 
-  _statusRanges(rowNumber, { status, sentAt, detail }) {
+  _statusRanges(sheet, rowNumber, { status, sentAt, detail }) {
     const data = [];
     if (status !== undefined) {
       // Tanpa kolom keterangan, alasan ditulis di kolom E: "Gagal (alasan)"
       const value = !this.detailColumn && detail ? `${status} (${detail})` : status;
-      data.push({ range: this.a1(`E${rowNumber}`), values: [[value]] });
+      data.push({ range: this.a1(sheet, `E${rowNumber}`), values: [[value]] });
     }
-    if (sentAt !== undefined) data.push({ range: this.a1(`F${rowNumber}`), values: [[sentAt]] });
+    if (sentAt !== undefined) data.push({ range: this.a1(sheet, `F${rowNumber}`), values: [[sentAt]] });
     if (detail !== undefined && this.detailColumn) {
-      data.push({ range: this.a1(`${this.detailColumn}${rowNumber}`), values: [[detail]] });
+      data.push({ range: this.a1(sheet, `${this.detailColumn}${rowNumber}`), values: [[detail]] });
     }
     return data;
   }
@@ -101,12 +144,13 @@ class SheetsClient {
     );
   }
 
-  async update(rowNumber, fields) {
-    await this._batch(this._statusRanges(rowNumber, fields));
+  async update(sheet, rowNumber, fields) {
+    await this._batch(this._statusRanges(sheet, rowNumber, fields));
   }
 
-  async markMany(rowNumbers, status, detail) {
-    await this._batch(rowNumbers.flatMap((n) => this._statusRanges(n, { status, detail })));
+  /** @param {Array<{sheet: string, rowNumber: number}>} rows */
+  async markMany(rows, status, detail) {
+    await this._batch(rows.flatMap((r) => this._statusRanges(r.sheet, r.rowNumber, { status, detail })));
   }
 
   /**
@@ -114,17 +158,23 @@ class SheetsClient {
    * mengurutkan data setelah job dibuat, jadi nomor HP dicocokkan ulang.
    * @returns {{row?: object, cancelled?: boolean}}
    */
-  async locate({ rowNumber, phone, name }) {
-    const direct = await this.readRow(rowNumber);
+  async locate({ sheet, rowNumber, phone, name }) {
+    sheet = sheet || this.defaultSheet;
+    const direct = await this.readRow(sheet, rowNumber);
     if (normalizePhone(direct.phoneRaw) === phone) {
       return eqStatus(direct.status, STATUS.QUEUED) ? { row: direct } : { cancelled: true, row: direct };
     }
-    const all = await this.readAll();
+    const all = await this.readAll([sheet]);
     const match =
       all.find((r) => normalizePhone(r.phoneRaw) === phone && eqStatus(r.status, STATUS.QUEUED) && r.name === name) ||
       all.find((r) => normalizePhone(r.phoneRaw) === phone && eqStatus(r.status, STATUS.QUEUED));
     return match ? { row: match } : {};
   }
+}
+
+/** Header minimal: kolom B berisi "Nama" dan kolom E berisi "Status". */
+function isCompatibleHeader(h) {
+  return /nama/i.test(String(h[1] || '')) && /status/i.test(String(h[4] || ''));
 }
 
 module.exports = { SheetsClient };

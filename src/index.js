@@ -16,6 +16,7 @@ const { createRedis, createQueue } = require('./queue/queue');
 const { createWorker } = require('./queue/worker');
 const { Producer } = require('./queue/producer');
 const { SheetsClient } = require('./sheets/sheets');
+const { SheetSources } = require('./sheets/sources');
 const { WhatsAppClient } = require('./whatsapp/client');
 const { createServer } = require('./web/server');
 const { msUntilSendWindow } = require('./utils/time');
@@ -26,7 +27,9 @@ async function main() {
   const redis = createRedis(config.redisUrl);
   const queue = createQueue(config, createRedis(config.redisUrl));
   const sheets = new SheetsClient(config.sheets, logger);
-  const wa = new WhatsAppClient(config.wa, logger);
+  const wa = new WhatsAppClient({ ...config.wa, redis }, logger);
+  const sources = new SheetSources({ redis, sheets, defaultSheet: config.sheets.sheetName }, logger);
+  await sources.init();
 
   // Tahan antrean sampai WhatsApp benar-benar "open".
   await queue.pause();
@@ -55,7 +58,7 @@ async function main() {
   wa.on('open', async () => {
     haltedReason = null;
     if (!manualPause) await queue.resume().catch((err) => logger.error({ err }));
-    activity('success', `WhatsApp terhubung sebagai +${wa.state.me}${manualPause ? ' (antrean masih dijeda manual)' : ''}`);
+    activity('success', `WhatsApp terhubung sebagai ${wa.state.name || `+${wa.state.me}`}${manualPause ? ' (antrean masih dijeda manual)' : ''}`);
   });
   wa.on('close', () => queue.pause().catch((err) => logger.error({ err })));
   wa.on('logged_out', () => {
@@ -70,7 +73,7 @@ async function main() {
   });
 
   const worker = createWorker({ config, connection: createRedis(config.redisUrl), redis, wa, sheets }, logger);
-  const producer = new Producer({ sheets, queue, intervalMs: config.pollIntervalMs }, logger);
+  const producer = new Producer({ sheets, sources, queue, intervalMs: config.pollIntervalMs }, logger);
 
   const getStats = async () => {
     const counts = await queue.getJobCounts('waiting', 'active', 'delayed', 'completed', 'failed', 'paused');
@@ -88,7 +91,7 @@ async function main() {
     };
   };
 
-  const app = createServer({ config, wa, producer, controls, getStats }, logger);
+  const app = createServer({ config, wa, producer, sources, controls, getStats }, logger);
   const server = app.listen(config.port, () => logger.info(`Dashboard: http://localhost:${config.port}`));
 
   await wa.start();

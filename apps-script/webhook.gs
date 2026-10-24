@@ -9,7 +9,8 @@
 const CONFIG = {
   WEBHOOK_URL: 'https://wa.contoh.ac.id/webhook/sheet',
   WEBHOOK_SECRET: 'samakan-dengan-WEBHOOK_SECRET-di-.env',
-  SHEET_NAME: 'Sheet1',
+  // Kosong = pantau semua sheet; backend yang menyaring sheet aktif (diatur di dashboard)
+  SHEET_NAMES: [],
   STATUS_COLUMN: 5, // E
   TRIGGER_VALUE: 'Kirim Tracer',
 };
@@ -17,7 +18,7 @@ const CONFIG = {
 function handleEdit(e) {
   if (!e || !e.range) return;
   const sheet = e.range.getSheet();
-  if (sheet.getName() !== CONFIG.SHEET_NAME) return;
+  if (CONFIG.SHEET_NAMES.length && CONFIG.SHEET_NAMES.indexOf(sheet.getName()) === -1) return;
 
   const col = e.range.getColumn();
   const lastCol = col + e.range.getNumColumns() - 1;
@@ -30,7 +31,7 @@ function handleEdit(e) {
     method: 'post',
     contentType: 'application/json',
     headers: { 'X-Webhook-Secret': CONFIG.WEBHOOK_SECRET },
-    payload: JSON.stringify({ row: e.range.getRow() }),
+    payload: JSON.stringify({ sheet: sheet.getName(), row: e.range.getRow() }),
     muteHttpExceptions: true,
   });
 }
